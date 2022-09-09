@@ -8,7 +8,7 @@ from influxdb_client import InfluxDBClient, Point, WritePrecision, WriteOptions
 from influxdb_client.client.write_api import SYNCHRONOUS
 
 
-import multiprocessing
+import threading
 import asyncio
 import configparser
 from functools import partial
@@ -48,21 +48,17 @@ class XiaoMiTemp(btle.DefaultDelegate):
         
 def listenDevice(write_client, address, location):
     print(f'Start listening device in {location}: with address {address}')
-
-    while True:
-        try:
-            p = btle.Peripheral( )
-            p.setDelegate(XiaoMiTemp(write_client, location))
+    p = btle.Peripheral( )
+    p.setDelegate(XiaoMiTemp(write_client, location))
     
-            print('Connect')
+    while True:
+        try:        
             p.connect(address)
-            print('Wait for notification')
             p.waitForNotifications(20.0)
-            print('Disconnect')
             p.disconnect()
         except:
             print('Error... oh well')
-        print('Take a nap')
+       
         time.sleep(300)
 
 
@@ -75,19 +71,18 @@ if __name__ == '__main__':
     client = InfluxDBClient(url='http://localhost:8086')
     write_client = client.write_api(write_options=SYNCHRONOUS)
     config = configparser.ConfigParser()
+    config.read('./config.ini')
 
     while True:
-        print('Refresh config...')
-        config.read('./config.ini')
         sections = config.sections()
         print(f'Sections in config {len(sections)}')
-        procs = []
-
+        
+        threads = []
         for s in sections:
-            process = multiprocessing.Process(target=listenDevice, args=(write_client, config[s]['address'], config[s]['name']))
-            procs.append(process)
-            process.start()
+            thread = threading.Thread(target=listenDevice, args=(write_client, config[s]['address'], config[s]['name']))
+            threads.append(thread)
+            thread.start()
 
-        for proc in procs:
-            proc.join()
+        for t in threads:
+            t.join()
 
