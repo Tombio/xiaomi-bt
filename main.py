@@ -55,18 +55,21 @@ class Worker(threading.Thread):
 
     def run(self):
         print(f'Start listening device in {self.location}: with address {self.address}')
-        p = btle.Peripheral( )
-        p.setDelegate(XiaoMiTemp(self.write_client, self.location)) 
     
         while True:
+            print(f'start loop for {self.location}')
             try:        
+                p = btle.Peripheral( )
+                p.setDelegate(XiaoMiTemp(self.write_client, self.location)) 
                 p.connect(self.address)
                 p.waitForNotifications(20.0)
                 p.disconnect()
             except:
                 print('Error... oh well')
        
-        time.sleep(3)
+            print(f'End loop for {self.location} and go ti sleep')
+            time.sleep(3)
+            print(f'Sleep done.. next round for {self.location}')
 
 
 
