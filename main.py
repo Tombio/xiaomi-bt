@@ -47,20 +47,26 @@ class XiaoMiTemp(btle.DefaultDelegate):
         self.write_client.write(bucket="homemeasurements", org="home", record=p)
     
 class Worker(threading.Thread):
-    def run(self, write_client, address, location):
-        print(f'Start listening device in {location}: with address {address}')
+    def __init__(self, write_client, address, location):
+        super(Worker, self).__init__()
+        self.write_client = write_client
+        self.address = address
+        self.location = location
+
+    def run(self):
+        print(f'Start listening device in {self.location}: with address {self.address}')
         p = btle.Peripheral( )
-        p.setDelegate(XiaoMiTemp(write_client, location)) 
+        p.setDelegate(XiaoMiTemp(self.write_client, self.location)) 
     
         while True:
             try:        
-                p.connect(address)
+                p.connect(self.address)
                 p.waitForNotifications(20.0)
                 p.disconnect()
             except:
                 print('Error... oh well')
        
-        time.sleep(300)
+        time.sleep(3)
 
 
 
@@ -71,17 +77,10 @@ if __name__ == '__main__':
     config = configparser.ConfigParser()
     config.read('./config.ini')
 
-    while True:
-        sections = config.sections()
-        print(f'Sections in config {len(sections)}')
-        
-        threads = []
-        for s in sections:
-            worker = Worker(write_client, config[s]['address'], config[s]['name'])
-            threads.append(worker)
-            worker.start()
-
-        for t in threads:
-            t.join()
-        
-
+    sections = config.sections()
+    print(f'Sections in config {len(sections)}')
+    threads = []
+    for s in sections:
+        worker = Worker(write_client, config[s]['address'], config[s]['name'])
+        threads.append(worker)
+        worker.start()
