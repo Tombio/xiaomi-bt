@@ -64,11 +64,12 @@ class Worker(threading.Thread):
                 p.connect(self.address)
                 p.waitForNotifications(20.0)
                 p.disconnect()
-            except:
+            except Exception:
                 print('Error... oh well')
+                print(traceback.format_exc())
        
             print(f'End loop for {self.location} and go ti sleep')
-            time.sleep(3)
+            time.sleep(300)
             print(f'Sleep done.. next round for {self.location}')
 
 
