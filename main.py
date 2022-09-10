@@ -15,11 +15,13 @@ from functools import partial
 import time
 
 class XiaoMiTemp(btle.DefaultDelegate):
-    def __init__(self,write_client,location):
+    def __init__(self,write_client,location, floor, id):
         btle.DefaultDelegate.__init__(self)
         # ... initialise here
         self.write_client = write_client
         self.LOC=location
+        self.floor=floor
+        self.id=id
         print('Delegate initilized')
 
     def handleNotification(self, cHandle, data):
@@ -32,26 +34,32 @@ class XiaoMiTemp(btle.DefaultDelegate):
         humid = int.from_bytes(databytes[2:3],"little")
         battery = int.from_bytes(databytes[3:5],"little")/1000
         
-        data1 = "{} temperature={}".format(self.LOC,temp)
-        data2 = "{} humidity={}".format(self.LOC,humid)
-        data3 = "{} battery={}".format(self.LOC,battery)
-        print(data1)
-        print(data2)
-        print(data3)
+        print("{} temperature={}".format(self.LOC,temp))
+        print("{} humidity={}".format(self.LOC,humid))
+        print("{} battery={}".format(self.LOC,battery))
        
-        p = Point("temperature").tag("location", self.LOC).field("value", temp)
+        self.writeToDb("temperature", {"location": self.LOC, "floor": self.floor, "id": self.id}, {"value": temp})
+        self.writeToDb("humidity", {"location": self.LOC, "floor": self.floor, "id": self.id}, {"value": humid})
+        self.writeToDb("battery", {"location": self.LOC, "floor": self.floor, "id": self.id}, {"value": battery})
+       
+    def writeToDb(self, point, tags, fields):
+        p = Point(point)
+        for k in tags.keys():
+            p.tag(k, tags[k])
+        
+        for k in fields.keys():
+            p.field(k, tags[k])
+
         self.write_client.write(bucket="homemeasurements", org="home", record=p)
-        p = Point("humidity").tag("location", self.LOC).field("value", humid)
-        self.write_client.write(bucket="homemeasurements", org="home", record=p)
-        p = Point("battery").tag("location", self.LOC).field("value", battery)
-        self.write_client.write(bucket="homemeasurements", org="home", record=p)
-    
+            
 class Worker(threading.Thread):
-    def __init__(self, write_client, address, location):
+    def __init__(self, write_client, address, location, floor = 0, id = 0):
         super(Worker, self).__init__()
         self.write_client = write_client
         self.address = address
         self.location = location
+        self.floor = floor
+        self.id = id
 
     def run(self):
         print(f'Start listening device in {self.location}: with address {self.address}')
@@ -60,7 +68,7 @@ class Worker(threading.Thread):
             print(f'start loop for {self.location}')
             try:        
                 p = btle.Peripheral( )
-                p.setDelegate(XiaoMiTemp(self.write_client, self.location)) 
+                p.setDelegate(XiaoMiTemp(self.write_client, self.location, self.floor, self.id)) 
                 p.connect(self.address)
                 p.waitForNotifications(20.0)
                 p.disconnect()
@@ -82,6 +90,10 @@ if __name__ == '__main__':
     print(f'Sections in config {len(sections)}')
     threads = []
     for s in sections:
-        worker = Worker(write_client, config[s]['address'], config[s]['name'])
+        worker = Worker(write_client, 
+                        config[s]['address'], 
+                        config[s]['name'], 
+                        config[s]['floor'], 
+                        config[s]['id'])
         threads.append(worker)
         worker.start()
