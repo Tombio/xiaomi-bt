@@ -48,7 +48,7 @@ class XiaoMiTemp(btle.DefaultDelegate):
             p.tag(k, tags[k])
         
         for k in fields.keys():
-            p.field(k, tags[k])
+            p.field(k, fields[k])
 
         self.write_client.write(bucket="homemeasurements", org="home", record=p)
             
